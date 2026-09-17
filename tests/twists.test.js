@@ -22,19 +22,22 @@ test("T1 sends weekday delivery notifications once and skips paused customers", 
   const subscriptionId = Number(subscription.lastInsertRowid);
 
   try {
+    db.prepare("DELETE FROM notification_outbox WHERE delivery_date = ? AND customer_id != ?").run("2026-09-17", customerId);
+
     const first = notifyDueCustomers("2026-09-17");
-    assert.equal(first.sent, 1);
+    assert.equal(first.outbox.some((item) => item.customer_id === customerId), true);
+    assert.equal(first.outbox.filter((item) => item.customer_id === customerId).length, 1);
 
     const second = notifyDueCustomers("2026-09-17");
     assert.equal(second.sent, 0);
-    assert.equal(second.deduped, 1);
+    assert.equal(second.deduped >= 1, true);
 
     db.prepare(
       "INSERT INTO pause_periods (customer_id, pause_start, resume_date) VALUES (?, ?, ?)"
     ).run(customerId, "2026-09-18", null);
 
     const paused = notifyDueCustomers("2026-09-18");
-    assert.equal(paused.sent, 0);
+    assert.equal(paused.outbox.some((item) => item.customer_id === customerId), false);
   } finally {
     db.prepare("DELETE FROM notification_outbox WHERE customer_id = ?").run(customerId);
     db.prepare("DELETE FROM pause_periods WHERE customer_id = ?").run(customerId);

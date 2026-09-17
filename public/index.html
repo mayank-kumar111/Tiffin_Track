@@ -3,12 +3,165 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TiffinTrack</title>
+  <meta name="description" content="TiffinTrack manages tiffin subscriptions, pauses, customer status, and prorated monthly billing.">
+  <title>TiffinTrack | Tiffin Subscription Manager</title>
+  <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <main>
-    <h1>TiffinTrack</h1>
-    <p>Simple subscription and billing management for tiffin services.</p>
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="TiffinTrack home">
+      <span class="brand-mark">T</span>
+      <span>TiffinTrack</span>
+    </a>
+    <nav class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#how-it-helps">How it helps</a>
+      <button class="ghost-btn" id="navLoginBtn">Login</button>
+      <button class="primary-btn" id="navRegisterBtn">Create account</button>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero-section">
+      <div class="hero-copy">
+        <span class="eyebrow">Tiffin service operations, simplified</span>
+        <h1>Track subscriptions. Pause deliveries. Bill only for days served.</h1>
+        <p class="hero-text">TiffinTrack gives home-style lunch businesses one place to manage customers, monthly plans, travel pauses, delivery status, and prorated bills.</p>
+        <div class="hero-actions">
+          <button class="primary-btn" id="heroRegisterBtn">Start using TiffinTrack</button>
+          <button class="secondary-btn" id="heroLoginBtn">Sign in</button>
+        </div>
+      </div>
+      <div class="hero-card">
+        <div class="hero-card-header">
+          <span>September billing snapshot</span>
+          <span class="status-pill status-active">Active</span>
+        </div>
+        <div class="amount">₹2,590.91</div>
+        <div class="hero-card-grid">
+          <div><strong>22</strong><span>service weekdays</span></div>
+          <div><strong>3</strong><span>paused weekdays</span></div>
+          <div><strong>19</strong><span>served weekdays</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <div class="section-heading">
+        <span class="eyebrow">Key features</span>
+        <h2>Designed around the real workflow of a tiffin business</h2>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card"><div class="feature-icon">01</div><h3>Customer search</h3><p>Find customers quickly by name or phone, then view their subscription and current service status.</p></article>
+        <article class="feature-card"><div class="feature-icon">02</div><h3>Pause & resume</h3><p>Record travel or festival breaks as date ranges so only actual service days affect the bill.</p></article>
+        <article class="feature-card"><div class="feature-icon">03</div><h3>Prorated billing</h3><p>Calculate monthly bills from weekdays served, with month boundaries handled by the billing engine.</p></article>
+      </div>
+    </section>
+
+    <section class="section split-section" id="how-it-helps">
+      <div>
+        <span class="eyebrow">Target audience</span>
+        <h2>For home-style lunch and tiffin operators</h2>
+        <p>Use one lightweight system instead of spreadsheets and manual calculations. Owners can see who is active, who is paused, and what each customer should be billed.</p>
+      </div>
+      <div class="next-features">
+        <h3>Planned next features</h3>
+        <div class="next-item"><span>04</span>Daily delivery notifications</div>
+        <div class="next-item"><span>05</span>Subscription transfers between customers</div>
+        <div class="next-item"><span>06</span>Messy-data import with rejection reports</div>
+      </div>
+    </section>
+
+    <section class="auth-section" id="authSection" hidden>
+      <div class="auth-card">
+        <div class="auth-tabs">
+          <button class="auth-tab active" data-mode="login">Login</button>
+          <button class="auth-tab" data-mode="register">Register</button>
+        </div>
+        <div id="authMessage" class="message" hidden></div>
+
+        <form id="loginForm" class="auth-form">
+          <label>Email<input type="email" name="email" required autocomplete="email"></label>
+          <label>Password<input type="password" name="password" required autocomplete="current-password"></label>
+          <button class="primary-btn full-btn" type="submit">Login</button>
+        </form>
+
+        <form id="registerForm" class="auth-form" hidden>
+          <label>Name<input type="text" name="name" required autocomplete="name"></label>
+          <label>Email<input type="email" name="email" required autocomplete="email"></label>
+          <label>Password<input type="password" name="password" minlength="6" required autocomplete="new-password"></label>
+          <button class="primary-btn full-btn" type="submit">Create account</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="dashboard-section" id="dashboardSection" hidden>
+      <div class="dashboard-topbar">
+        <div>
+          <span class="eyebrow">Owner dashboard</span>
+          <h2>Good to see you, <span id="userName">Owner</span>.</h2>
+        </div>
+        <button class="ghost-btn" id="logoutBtn">Logout</button>
+      </div>
+
+      <div class="dashboard-grid">
+        <article class="metric-card"><span>Total customers</span><strong id="totalCustomers">0</strong></article>
+        <article class="metric-card"><span>Active</span><strong id="activeCustomers">0</strong></article>
+        <article class="metric-card"><span>Paused</span><strong id="pausedCustomers">0</strong></article>
+        <article class="metric-card"><span>September bill</span><strong id="totalBilling">₹0.00</strong></article>
+      </div>
+
+      <div class="workspace-grid">
+        <section class="panel">
+          <div class="panel-heading">
+            <div><h3>Customers</h3><p>Search, filter, and inspect service status.</p></div>
+            <button class="primary-btn" id="newCustomerBtn">+ Customer</button>
+          </div>
+          <div class="toolbar">
+            <input id="customerSearch" placeholder="Search by name or phone">
+            <select id="customerStatus"><option value="">All status</option><option value="active">Active</option><option value="paused">Paused</option><option value="inactive">Inactive</option></select>
+            <select id="customerSort"><option value="name">Name</option><option value="phone">Phone</option><option value="created_at">Created</option></select>
+            <select id="customerOrder"><option value="asc">A-Z</option><option value="desc">Z-A</option></select>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>Customer</th><th>Phone</th><th>Status</th><th>Actions</th></tr></thead><tbody id="customerTableBody"></tbody></table></div>
+          <div class="pagination"><button class="ghost-btn" id="customerPrev">Previous</button><span id="customerPageInfo">Page 1</span><button class="ghost-btn" id="customerNext">Next</button></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <div><h3>Monthly bills</h3><p>Current month service and prorated amounts.</p></div>
+            <input id="billMonth" type="month" value="2026-09">
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>Customer</th><th>Served</th><th>Paused</th><th>Bill</th></tr></thead><tbody id="billTableBody"></tbody></table></div>
+        </section>
+      </div>
+    </section>
   </main>
+
+  <dialog id="customerDialog" class="modal">
+    <form method="dialog" class="modal-card" id="customerForm">
+      <div class="panel-heading"><div><h3>New customer</h3><p>Add a tiffin customer.</p></div><button class="icon-btn" value="cancel" aria-label="Close">×</button></div>
+      <label>Name<input type="text" name="name" required></label>
+      <label>Phone<input type="tel" name="phone" required></label>
+      <label>Address<input type="text" name="address"></label>
+      <div id="customerFormMessage" class="message" hidden></div>
+      <button class="primary-btn full-btn" type="submit">Save customer</button>
+    </form>
+  </dialog>
+
+  <dialog id="subscriptionDialog" class="modal">
+    <form method="dialog" class="modal-card" id="subscriptionForm">
+      <div class="panel-heading"><div><h3>Start subscription</h3><p>Set the monthly plan and billing start date.</p></div><button class="icon-btn" value="cancel" aria-label="Close">×</button></div>
+      <input type="hidden" name="customerId" id="subscriptionCustomerId">
+      <div class="selected-customer" id="subscriptionCustomerName"></div>
+      <label>Plan name<input type="text" name="planName" value="Monthly Lunch" required></label>
+      <label>Monthly price<input type="number" name="monthlyPrice" min="1" step="0.01" value="3000" required></label>
+      <label>Start date<input type="date" name="startDate" required></label>
+      <div id="subscriptionFormMessage" class="message" hidden></div>
+      <button class="primary-btn full-btn" type="submit">Start subscription</button>
+    </form>
+  </dialog>
+
+  <script src="/app.js"></script>
 </body>
 </html>

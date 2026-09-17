@@ -21,31 +21,27 @@ function getDueCustomers(deliveryDate) {
     `SELECT c.id, c.name, c.phone, s.id AS subscription_id, s.plan_name
      FROM customers c
      INNER JOIN subscriptions s ON s.customer_id = c.id AND s.active = 1
-     WHERE NOT EXISTS (
-       SELECT 1
-       FROM pause_periods p
-       WHERE p.customer_id = c.id
-         AND p.pause_start <= ?
-         AND (p.resume_date IS NULL OR p.resume_date > ?)
-     )
+     WHERE s.start_date <= ?
+       AND NOT EXISTS (
+         SELECT 1
+         FROM pause_periods p
+         WHERE p.customer_id = c.id
+           AND p.pause_start <= ?
+           AND (p.resume_date IS NULL OR p.resume_date > ?)
+       )
      ORDER BY c.name ASC`
-  ).all(deliveryDate, deliveryDate);
+  ).all(deliveryDate, deliveryDate, deliveryDate);
 }
 
 function notifyDueCustomers(deliveryDate) {
   const dueCustomers = getDueCustomers(deliveryDate);
-
-  if (!dueCustomers.length) {
-    return { delivery_date: deliveryDate, weekday: isWeekday(deliveryDate), sent: 0, deduped: 0, outbox: [] };
-  }
-
   const insertOutbox = db.prepare(
     `INSERT OR IGNORE INTO notification_outbox
       (customer_id, subscription_id, delivery_date, channel, message)
      VALUES (?, ?, ?, 'notification_service', ?)`
   );
 
-  const transaction = db.transaction((customers) => {
+  const runTransaction = db.transaction((customers) => {
     const outbox = [];
     let deduped = 0;
 
@@ -74,12 +70,14 @@ function notifyDueCustomers(deliveryDate) {
     return { outbox, deduped };
   });
 
+  const result = runTransaction(dueCustomers);
+
   return {
     delivery_date: deliveryDate,
-    weekday: true,
-    sent: transaction.outbox.length,
-    deduped: transaction.deduped,
-    outbox: transaction.outbox
+    weekday: isWeekday(deliveryDate),
+    sent: result.outbox.length,
+    deduped: result.deduped,
+    outbox: result.outbox
   };
 }
 

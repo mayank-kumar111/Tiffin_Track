@@ -4,17 +4,22 @@ const db = require("../src/db");
 const { notifyDueCustomers } = require("../src/services/notificationService");
 const { getCustomerBill } = require("../src/services/billing");
 
+function uniquePhone(prefix) {
+  const suffix = `${Date.now()}${Math.floor(Math.random() * 100000)}`;
+  return `${prefix}${suffix}`.slice(0, 15);
+}
+
 test("T1 sends weekday delivery notifications once and skips paused customers", () => {
-  const suffix = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
-  const phone = `9${suffix}`.slice(0, 10);
+  const phone = uniquePhone("7");
   const customer = db.prepare(
     "INSERT INTO customers (name, phone, address) VALUES (?, ?, ?)"
-  ).run(`Twist Notify ${suffix}`, phone, "Jaipur");
+  ).run(`Twist Notify ${phone}`, phone, "Jaipur");
   const customerId = Number(customer.lastInsertRowid);
   const subscription = db.prepare(
     `INSERT INTO subscriptions (customer_id, plan_name, monthly_price, start_date, active)
      VALUES (?, ?, ?, ?, 1)`
   ).run(customerId, "Monthly Lunch", 3000, "2026-09-01");
+  const subscriptionId = Number(subscription.lastInsertRowid);
 
   try {
     const first = notifyDueCustomers("2026-09-17");
@@ -33,22 +38,21 @@ test("T1 sends weekday delivery notifications once and skips paused customers", 
   } finally {
     db.prepare("DELETE FROM notification_outbox WHERE customer_id = ?").run(customerId);
     db.prepare("DELETE FROM pause_periods WHERE customer_id = ?").run(customerId);
-    db.prepare("DELETE FROM subscriptions WHERE id = ?").run(Number(subscription.lastInsertRowid));
+    db.prepare("DELETE FROM subscriptions WHERE id = ?").run(subscriptionId);
     db.prepare("DELETE FROM customers WHERE id = ?").run(customerId);
   }
 });
 
 test("T6 splits a monthly bill by subscription ownership before and after transfer", () => {
-  const suffix = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
-  const oldPhone = `8${suffix}1`.slice(0, 10);
-  const newPhone = `8${suffix}2`.slice(0, 10);
+  const oldPhone = uniquePhone("5");
+  const newPhone = uniquePhone("6");
 
   const oldCustomer = db.prepare(
     "INSERT INTO customers (name, phone, address) VALUES (?, ?, ?)"
-  ).run(`Old Owner ${suffix}`, oldPhone, "Jaipur");
+  ).run(`Old Owner ${oldPhone}`, oldPhone, "Jaipur");
   const newCustomer = db.prepare(
     "INSERT INTO customers (name, phone, address) VALUES (?, ?, ?)"
-  ).run(`New Owner ${suffix}`, newPhone, "Jaipur");
+  ).run(`New Owner ${newPhone}`, newPhone, "Jaipur");
 
   const oldCustomerId = Number(oldCustomer.lastInsertRowid);
   const newCustomerId = Number(newCustomer.lastInsertRowid);

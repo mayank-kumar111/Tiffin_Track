@@ -94,7 +94,9 @@ JSON array example:
 }
 ```
 
-CSV text is also accepted with a `csv` field. The importer normalizes phone values, supports common mixed date forms such as `YYYY-MM-DD`, `YYYY/MM/DD`, `DD/MM/YYYY`, `DD-MM-YYYY`, and `MM/DD/YYYY`, and rejects rows with missing/invalid required fields.
+CSV text is also accepted with a `csv` field. The importer normalizes phone values, supports `YYYY-MM-DD`, `YYYY/MM/DD`, `DD/MM/YYYY`, and `DD-MM-YYYY`. When a numeric slash/dash date is ambiguous (for example `01/09/2026`), the importer uses DD/MM/YYYY as the assessment locale convention.
+
+Rows with missing/invalid required fields are rejected. Duplicate phones inside the import or already present in the database are counted as deduped.
 
 The response contains the required counters:
 

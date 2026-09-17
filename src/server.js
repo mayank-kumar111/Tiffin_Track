@@ -7,6 +7,8 @@ const customerRoutes = require("./routes/customers");
 const subscriptionRoutes = require("./routes/subscriptions");
 const pauseRoutes = require("./routes/pauses");
 const billRoutes = require("./routes/bills");
+const { authenticateToken } = require("./middleware/auth");
+const { getCustomerBill, getMonthBounds } = require("./services/billing");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,15 +18,36 @@ app.use(express.json());
 app.use(express.static("public"));
 
 app.use("/api/auth", authRoutes);
+
+app.get("/api/customers/:customerId/bill", authenticateToken, (req, res) => {
+  const customerId = Number(req.params.customerId);
+  const month = req.query.month || new Date().toISOString().slice(0, 7);
+
+  if (!Number.isInteger(customerId) || customerId <= 0) {
+    return res.status(400).json({ success: false, message: "Invalid customerId" });
+  }
+
+  if (!getMonthBounds(month)) {
+    return res.status(400).json({ success: false, message: "month must use YYYY-MM format" });
+  }
+
+  const customerExists = db.prepare("SELECT id FROM customers WHERE id = ?").get(customerId);
+  if (!customerExists) {
+    return res.status(404).json({ success: false, message: "Customer not found" });
+  }
+
+  const bill = getCustomerBill(customerId, month);
+  if (!bill) {
+    return res.status(404).json({ success: false, message: "Subscription not found" });
+  }
+
+  return res.json({ success: true, ...bill });
+});
+
 app.use("/api/customers", customerRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/customers", pauseRoutes);
 app.use("/api/bills", billRoutes);
-
-app.get("/api/customers/:customerId/bill", (req, res, next) => {
-  req.url = `/api/customers/${req.params.customerId}/bill${req.url.includes("?") ? `?${req.url.split("?")[1]}` : ""}`;
-  next();
-});
 
 app.get("/api/health", (req, res) => {
   res.json({

@@ -137,6 +137,7 @@ async function loadCustomers() {
         <td><div class="table-actions">
           ${customer.status === "active" ? `<button class="small-btn" data-action="pause" data-id="${customer.id}">Pause</button>` : ""}
           ${customer.status === "paused" ? `<button class="small-btn" data-action="resume" data-id="${customer.id}">Resume</button>` : ""}
+          ${customer.status === "inactive" ? `<button class="small-btn" data-action="subscribe" data-id="${customer.id}" data-name="${escapeHtml(customer.name)}" data-phone="${escapeHtml(customer.phone)}">Subscribe</button>` : ""}
           <button class="small-btn" data-action="bill" data-id="${customer.id}">Bill</button>
         </div></td>
       </tr>
@@ -235,6 +236,7 @@ function openSubscription(customer) {
   $("#subscriptionCustomerId").value = customer.id;
   $("#subscriptionCustomerName").textContent = `${customer.name} • ${customer.phone}`;
   $("#subscriptionForm").querySelector('[name="startDate"]').value = new Date().toISOString().slice(0, 10);
+  setMessage($("#subscriptionFormMessage"), "");
   $("#subscriptionDialog").showModal();
 }
 
@@ -287,6 +289,9 @@ $("#customerTableBody").addEventListener("click", async (event) => {
   const customerId = Number(button.dataset.id);
   if (button.dataset.action === "pause") await pauseCustomer(customerId);
   if (button.dataset.action === "resume") await resumeCustomer(customerId);
+  if (button.dataset.action === "subscribe") {
+    openSubscription({ id: customerId, name: button.dataset.name, phone: button.dataset.phone });
+  }
   if (button.dataset.action === "bill") await showBill(customerId);
 });
 

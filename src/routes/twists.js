@@ -31,6 +31,7 @@ function normalizeDate(value) {
     const b = Number(second);
     let month;
     let day;
+
     if (a > 12) {
       day = a;
       month = b;
@@ -38,9 +39,9 @@ function normalizeDate(value) {
       month = a;
       day = b;
     } else {
-      // Ambiguous numeric dates are treated as MM/DD/YYYY.
-      month = a;
-      day = b;
+      // Assessment data is assumed to use Indian-style DD/MM/YYYY for ambiguous dates.
+      day = a;
+      month = b;
     }
 
     const normalized = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;

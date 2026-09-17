@@ -71,6 +71,8 @@ router.get("/", (req, res) => {
       100
     );
     const search = String(req.query.search || "").trim();
+    const requestedStatus = String(req.query.status || "all").toLowerCase();
+    const status = ["active", "paused", "all"].includes(requestedStatus) ? requestedStatus : "all";
     const sortMap = {
       name: "name",
       phone: "phone",
@@ -79,28 +81,70 @@ router.get("/", (req, res) => {
     const sort = sortMap[req.query.sort] || "created_at";
     const order = String(req.query.order || "desc").toLowerCase() === "asc" ? "ASC" : "DESC";
     const offset = (page - 1) * limit;
+    const today = new Date().toISOString().slice(0, 10);
 
     let where = "";
     const params = [];
+    const clauses = [];
 
     if (search) {
-      where = "WHERE name LIKE ? OR phone LIKE ?";
+      clauses.push("(c.name LIKE ? OR c.phone LIKE ?)");
       params.push(`%${search}%`, `%${search}%`);
     }
 
+    if (status !== "all") {
+      const isPaused = status === "paused" ? 1 : 0;
+      clauses.push(`
+        EXISTS (
+          SELECT 1
+          FROM subscriptions s_status
+          WHERE s_status.customer_id = c.id AND s_status.active = 1
+        )
+        AND (
+          EXISTS (
+            SELECT 1
+            FROM pause_periods p_status
+            WHERE p_status.customer_id = c.id
+              AND p_status.pause_start <= ?
+              AND (p_status.resume_date IS NULL OR p_status.resume_date > ?)
+          )
+        ) = ?
+      `);
+      params.push(today, today, isPaused);
+    }
+
+    if (clauses.length) where = `WHERE ${clauses.join(" AND ")}`;
+
     const totalRow = db
-      .prepare(`SELECT COUNT(*) AS total FROM customers ${where}`)
+      .prepare(`SELECT COUNT(*) AS total FROM customers c ${where}`)
       .get(...params);
 
     const customers = db
       .prepare(
-        `SELECT id, name, phone, address, created_at
-         FROM customers
+        `SELECT c.id, c.name, c.phone, c.address, c.created_at,
+                CASE
+                  WHEN EXISTS (
+                    SELECT 1 FROM subscriptions s_active
+                    WHERE s_active.customer_id = c.id AND s_active.active = 1
+                  )
+                  AND EXISTS (
+                    SELECT 1 FROM pause_periods p_active
+                    WHERE p_active.customer_id = c.id
+                      AND p_active.pause_start <= ?
+                      AND (p_active.resume_date IS NULL OR p_active.resume_date > ?)
+                  ) THEN 'paused'
+                  WHEN EXISTS (
+                    SELECT 1 FROM subscriptions s_active
+                    WHERE s_active.customer_id = c.id AND s_active.active = 1
+                  ) THEN 'active'
+                  ELSE 'inactive'
+                END AS status
+         FROM customers c
          ${where}
          ORDER BY ${sort} ${order}
          LIMIT ? OFFSET ?`
       )
-      .all(...params, limit, offset);
+      .all(today, today, ...params, limit, offset);
 
     const total = totalRow.total;
     const totalPages = Math.ceil(total / limit);
@@ -118,7 +162,8 @@ router.get("/", (req, res) => {
         sort,
         order: order.toLowerCase()
       },
-      search: search || null
+      search: search || null,
+      status
     });
   } catch (error) {
     console.error("List customers error:", error);

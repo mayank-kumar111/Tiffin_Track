@@ -193,9 +193,10 @@ async function loadCustomers() {
         <td>${escapeHtml(customer.phone)}</td>
         <td><span class="status-pill status-${escapeHtml(customer.status)}">${escapeHtml(customer.status)}</span></td>
         <td><div class="table-actions">
+          ${customer.status === "inactive" ? `<button type="button" class="small-btn" data-action="subscribe" data-id="${customer.id}">Subscribe</button>` : ""}
           ${customer.status === "active" ? `<button type="button" class="small-btn" data-action="pause" data-id="${customer.id}">Pause</button>` : ""}
           ${customer.status === "paused" ? `<button type="button" class="small-btn" data-action="resume" data-id="${customer.id}">Resume</button>` : ""}
-          <button type="button" class="small-btn" data-action="bill" data-id="${customer.id}">Bill</button>
+          ${customer.status !== "inactive" ? `<button type="button" class="small-btn" data-action="bill" data-id="${customer.id}">Bill</button>` : ""}
         </div></td>
       </tr>
     `).join("");
@@ -284,6 +285,17 @@ async function showBill(customerId) {
   } catch (error) {
     window.alert(error.message);
   }
+}
+
+function openSubscription(customer) {
+  state.selectedCustomer = customer;
+  $("#subscriptionCustomerId").value = customer.id;
+  $("#subscriptionCustomerName").textContent = `${customer.name} • ${customer.phone}`;
+  $("#subscriptionForm").querySelector('[name="planName"]').value = "Monthly Lunch";
+  $("#subscriptionForm").querySelector('[name="monthlyPrice"]').value = "3000";
+  $("#subscriptionForm").querySelector('[name="startDate"]').value = new Date().toISOString().slice(0, 10);
+  setMessage($("#subscriptionFormMessage"), "");
+  $("#subscriptionDialog").showModal();
 }
 
 async function createCustomer(form) {
@@ -397,6 +409,15 @@ function bindEvents() {
     if (!button) return;
 
     const customerId = Number(button.dataset.id);
+    const row = button.closest("tr");
+    const cells = row?.querySelectorAll("td");
+    const customer = {
+      id: customerId,
+      name: cells?.[0]?.textContent?.trim() || "Customer",
+      phone: cells?.[1]?.textContent?.trim() || ""
+    };
+
+    if (button.dataset.action === "subscribe") openSubscription(customer);
     if (button.dataset.action === "pause") await pauseCustomer(customerId);
     if (button.dataset.action === "resume") await resumeCustomer(customerId);
     if (button.dataset.action === "bill") await showBill(customerId);

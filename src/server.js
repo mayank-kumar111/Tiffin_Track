@@ -7,6 +7,7 @@ const customerRoutes = require("./routes/customers");
 const subscriptionRoutes = require("./routes/subscriptions");
 const pauseRoutes = require("./routes/pauses");
 const billRoutes = require("./routes/bills");
+const twistRoutes = require("./routes/twists");
 const { authenticateToken } = require("./middleware/auth");
 const { getCustomerBill, getMonthBounds } = require("./services/billing");
 
@@ -48,6 +49,10 @@ app.use("/api/customers", customerRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/customers", pauseRoutes);
 app.use("/api/bills", billRoutes);
+
+// Assessment twists: expose canonical /clock and /outbox plus /api aliases.
+app.use("/", twistRoutes);
+app.use("/api", twistRoutes);
 
 app.get("/api/health", (req, res) => {
   res.json({

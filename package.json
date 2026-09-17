@@ -1,16 +1,23 @@
 {
   "name": "tiffin_track",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "TiffinTrack subscription and prorated billing manager",
+  "main": "src/server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node src/server.js",
+    "test": "node --test"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mayank-kumar111/Tiffin_Track.git"
   },
-  "keywords": [],
+  "keywords": [
+    "tiffin",
+    "subscription",
+    "billing",
+    "express",
+    "sqlite"
+  ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",

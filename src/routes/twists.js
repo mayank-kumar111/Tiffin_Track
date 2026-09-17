@@ -12,20 +12,25 @@ function normalizePhone(phone) {
 function normalizeDate(value) {
   if (value === undefined || value === null || String(value).trim() === "") return null;
   const raw = String(value).trim();
+
   const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (iso) {
-    const date = new Date(`${raw}T00:00:00Z`);
-    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === raw ? raw : null;
+  const yearFirst = raw.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
+  if (iso || yearFirst) {
+    const y = iso ? iso[1] : yearFirst[1];
+    const m = iso ? iso[2] : yearFirst[2];
+    const d = iso ? iso[3] : yearFirst[3];
+    const normalized = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const date = new Date(`${normalized}T00:00:00Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === normalized ? normalized : null;
   }
 
   const slashOrDash = raw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
   if (slashOrDash) {
-    let [, first, second, year] = slashOrDash;
-    let month;
-    let day;
+    const [, first, second, year] = slashOrDash;
     const a = Number(first);
     const b = Number(second);
-
+    let month;
+    let day;
     if (a > 12) {
       day = a;
       month = b;
@@ -33,15 +38,14 @@ function normalizeDate(value) {
       month = a;
       day = b;
     } else {
+      // Ambiguous numeric dates are treated as MM/DD/YYYY.
       month = a;
       day = b;
     }
 
     const normalized = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     const date = new Date(`${normalized}T00:00:00Z`);
-    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === normalized
-      ? normalized
-      : null;
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === normalized ? normalized : null;
   }
 
   return null;
@@ -56,7 +60,6 @@ function parseCsv(text) {
   for (let i = 0; i < text.length; i += 1) {
     const char = text[i];
     const next = text[i + 1];
-
     if (char === '"') {
       if (quoted && next === '"') {
         cell += '"';
@@ -162,9 +165,7 @@ router.post("/subscriptions/:id/transfer", authenticateToken, (req, res) => {
   const subscription = db.prepare("SELECT * FROM subscriptions WHERE id = ?").get(subscriptionId);
   if (!subscription) return res.status(404).json({ success: false, message: "Subscription not found" });
   if (!subscription.active) return res.status(409).json({ success: false, message: "Only an active subscription can be transferred" });
-  if (subscription.customer_id === toCustomerId) {
-    return res.status(400).json({ success: false, message: "Subscription already belongs to this customer" });
-  }
+  if (subscription.customer_id === toCustomerId) return res.status(400).json({ success: false, message: "Subscription already belongs to this customer" });
   if (effectiveDate < subscription.start_date) {
     return res.status(400).json({ success: false, message: "effectiveDate cannot be before the subscription start date" });
   }
@@ -172,14 +173,9 @@ router.post("/subscriptions/:id/transfer", authenticateToken, (req, res) => {
   const targetCustomer = db.prepare("SELECT id, name, phone FROM customers WHERE id = ?").get(toCustomerId);
   if (!targetCustomer) return res.status(404).json({ success: false, message: "Target customer not found" });
 
-  const targetActive = db.prepare(
-    "SELECT id FROM subscriptions WHERE customer_id = ? AND active = 1"
-  ).get(toCustomerId);
+  const targetActive = db.prepare("SELECT id FROM subscriptions WHERE customer_id = ? AND active = 1").get(toCustomerId);
   if (targetActive) {
-    return res.status(409).json({
-      success: false,
-      message: "Target customer already has an active subscription"
-    });
+    return res.status(409).json({ success: false, message: "Target customer already has an active subscription" });
   }
 
   const conflictingTransfer = db.prepare(
@@ -189,18 +185,15 @@ router.post("/subscriptions/:id/transfer", authenticateToken, (req, res) => {
     return res.status(409).json({ success: false, message: "A transfer already exists for this effective date" });
   }
 
-  const transaction = db.transaction(() => {
-    db.prepare(
-      `INSERT INTO subscription_transfers
-       (subscription_id, from_customer_id, to_customer_id, effective_date)
-       VALUES (?, ?, ?, ?)`
-    ).run(subscriptionId, subscription.customer_id, toCustomerId, effectiveDate);
-
-    db.prepare("UPDATE subscriptions SET customer_id = ? WHERE id = ?").run(toCustomerId, subscriptionId);
-  });
-
   try {
-    transaction();
+    db.transaction(() => {
+      db.prepare(
+        `INSERT INTO subscription_transfers
+         (subscription_id, from_customer_id, to_customer_id, effective_date)
+         VALUES (?, ?, ?, ?)`
+      ).run(subscriptionId, subscription.customer_id, toCustomerId, effectiveDate);
+      db.prepare("UPDATE subscriptions SET customer_id = ? WHERE id = ?").run(toCustomerId, subscriptionId);
+    })();
   } catch (error) {
     console.error("Subscription transfer error:", error);
     return res.status(500).json({ success: false, message: "Unable to transfer subscription" });
@@ -221,25 +214,15 @@ router.post("/subscriptions/:id/transfer", authenticateToken, (req, res) => {
 router.post("/import/customers", authenticateToken, (req, res) => {
   const rows = rowsFromRequest(req.body || {});
   if (!rows.length) {
-    return res.status(400).json({
-      success: false,
-      message: "Provide customers/rows/data array or a csv string"
-    });
+    return res.status(400).json({ success: false, message: "Provide customers/rows/data array or a csv string" });
   }
 
-  const report = {
-    imported: 0,
-    deduped: 0,
-    rejected: 0,
-    errors: [],
-    deduped_rows: []
-  };
-
+  const report = { imported: 0, deduped: 0, rejected: 0, errors: [], deduped_rows: [] };
   const seenPhones = new Set();
 
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index] || {};
-    const name = String(firstValue(row, ["name", "customer_name"]).trim());
+    const name = String(firstValue(row, ["name", "customer_name"])).trim();
     const phone = normalizePhone(firstValue(row, ["phone", "mobile", "mobile_number", "phone_number"]));
     const addressValue = firstValue(row, ["address", "location"]);
     const planName = String(firstValue(row, ["plan_name", "plan", "subscription", "package"]) || "Monthly Lunch").trim();
@@ -277,7 +260,7 @@ router.post("/import/customers", authenticateToken, (req, res) => {
     }
 
     try {
-      const transaction = db.transaction(() => {
+      db.transaction(() => {
         const customerResult = db.prepare(
           "INSERT INTO customers (name, phone, address) VALUES (?, ?, ?)"
         ).run(name, phone, addressValue ? String(addressValue).trim() : null);
@@ -287,9 +270,7 @@ router.post("/import/customers", authenticateToken, (req, res) => {
            (customer_id, plan_name, monthly_price, start_date, active)
            VALUES (?, ?, ?, ?, 1)`
         ).run(customerResult.lastInsertRowid, planName, price, startDate);
-      });
-
-      transaction();
+      })();
       report.imported += 1;
     } catch (error) {
       report.rejected += 1;

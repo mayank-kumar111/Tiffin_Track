@@ -5,6 +5,7 @@ const db = require("./db");
 const authRoutes = require("./routes/auth");
 const customerRoutes = require("./routes/customers");
 const subscriptionRoutes = require("./routes/subscriptions");
+const pauseRoutes = require("./routes/pauses");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,6 +17,7 @@ app.use(express.static("public"));
 app.use("/api/auth", authRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
+app.use("/api/customers", pauseRoutes);
 
 app.get("/api/health", (req, res) => {
   res.json({

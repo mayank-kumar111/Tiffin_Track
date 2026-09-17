@@ -9,7 +9,6 @@ const dbPath = path.join(dataDir, "tiffin_track.db");
 const db = new Database(dbPath);
 
 db.pragma("foreign_keys = ON");
-
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,6 +46,31 @@ db.exec(`
     FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
   );
 
+  CREATE TABLE IF NOT EXISTS subscription_transfers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    subscription_id INTEGER NOT NULL,
+    from_customer_id INTEGER NOT NULL,
+    to_customer_id INTEGER NOT NULL,
+    effective_date TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE,
+    FOREIGN KEY (from_customer_id) REFERENCES customers(id) ON DELETE CASCADE,
+    FOREIGN KEY (to_customer_id) REFERENCES customers(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS notification_outbox (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_id INTEGER NOT NULL,
+    subscription_id INTEGER NOT NULL,
+    delivery_date TEXT NOT NULL,
+    channel TEXT NOT NULL DEFAULT 'notification_service',
+    message TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(customer_id, delivery_date),
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
+    FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE
+  );
+
   CREATE INDEX IF NOT EXISTS idx_customers_phone
     ON customers(phone);
 
@@ -55,6 +79,12 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_subscriptions_customer
     ON subscriptions(customer_id);
+
+  CREATE INDEX IF NOT EXISTS idx_subscription_transfers_subscription
+    ON subscription_transfers(subscription_id, effective_date);
+
+  CREATE INDEX IF NOT EXISTS idx_notification_outbox_date
+    ON notification_outbox(delivery_date);
 `);
 
 module.exports = db;

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="TiffinTrack manages tiffin subscriptions, pauses, customer status, and prorated monthly billing.">
   <title>TiffinTrack | Tiffin Subscription Manager</title>
-  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/style.css?v=2">
 </head>
 <body>
   <header class="site-header">
@@ -16,8 +16,8 @@
     <nav class="nav-links">
       <a href="#features">Features</a>
       <a href="#how-it-helps">How it helps</a>
-      <button class="ghost-btn" id="navLoginBtn">Login</button>
-      <button class="primary-btn" id="navRegisterBtn">Create account</button>
+      <button type="button" class="ghost-btn" id="navLoginBtn">Login</button>
+      <button type="button" class="primary-btn" id="navRegisterBtn">Create account</button>
     </nav>
   </header>
 
@@ -28,8 +28,8 @@
         <h1>Track subscriptions. Pause deliveries. Bill only for days served.</h1>
         <p class="hero-text">TiffinTrack gives home-style lunch businesses one place to manage customers, monthly plans, travel pauses, delivery status, and prorated bills.</p>
         <div class="hero-actions">
-          <button class="primary-btn" id="heroRegisterBtn">Start using TiffinTrack</button>
-          <button class="secondary-btn" id="heroLoginBtn">Sign in</button>
+          <button type="button" class="primary-btn" id="heroRegisterBtn">Start using TiffinTrack</button>
+          <button type="button" class="secondary-btn" id="heroLoginBtn">Sign in</button>
         </div>
       </div>
       <div class="hero-card">
@@ -75,8 +75,8 @@
     <section class="auth-section" id="authSection" hidden>
       <div class="auth-card">
         <div class="auth-tabs">
-          <button class="auth-tab active" data-mode="login">Login</button>
-          <button class="auth-tab" data-mode="register">Register</button>
+          <button type="button" class="auth-tab active" data-mode="login">Login</button>
+          <button type="button" class="auth-tab" data-mode="register">Register</button>
         </div>
         <div id="authMessage" class="message" hidden></div>
 
@@ -101,7 +101,7 @@
           <span class="eyebrow">Owner dashboard</span>
           <h2>Good to see you, <span id="userName">Owner</span>.</h2>
         </div>
-        <button class="ghost-btn" id="logoutBtn">Logout</button>
+        <button type="button" class="ghost-btn" id="logoutBtn">Logout</button>
       </div>
 
       <div class="dashboard-grid">
@@ -115,7 +115,7 @@
         <section class="panel">
           <div class="panel-heading">
             <div><h3>Customers</h3><p>Search, filter, and inspect service status.</p></div>
-            <button class="primary-btn" id="newCustomerBtn">+ Customer</button>
+            <button type="button" class="primary-btn" id="newCustomerBtn">+ Customer</button>
           </div>
           <div class="toolbar">
             <input id="customerSearch" placeholder="Search by name or phone">
@@ -124,7 +124,7 @@
             <select id="customerOrder"><option value="asc">A-Z</option><option value="desc">Z-A</option></select>
           </div>
           <div class="table-wrap"><table><thead><tr><th>Customer</th><th>Phone</th><th>Status</th><th>Actions</th></tr></thead><tbody id="customerTableBody"></tbody></table></div>
-          <div class="pagination"><button class="ghost-btn" id="customerPrev">Previous</button><span id="customerPageInfo">Page 1</span><button class="ghost-btn" id="customerNext">Next</button></div>
+          <div class="pagination"><button type="button" class="ghost-btn" id="customerPrev">Previous</button><span id="customerPageInfo">Page 1</span><button type="button" class="ghost-btn" id="customerNext">Next</button></div>
         </section>
 
         <section class="panel">
@@ -162,6 +162,6 @@
     </form>
   </dialog>
 
-  <script src="/app.js"></script>
+  <script src="/app.js?v=3"></script>
 </body>
 </html>

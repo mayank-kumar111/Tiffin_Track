@@ -12,13 +12,11 @@ function formatDate(date) {
 
 function getMonthBounds(month) {
   if (!/^\d{4}-\d{2}$/.test(month)) return null;
-
   const [year, monthNumber] = month.split("-").map(Number);
   if (monthNumber < 1 || monthNumber > 12) return null;
 
   const start = new Date(Date.UTC(year, monthNumber - 1, 1));
   const end = new Date(Date.UTC(year, monthNumber, 0));
-
   return {
     start,
     end,
@@ -35,18 +33,15 @@ function isWeekday(date) {
 function getServiceDays(startDate, endDate) {
   let current = new Date(startDate.getTime());
   let count = 0;
-
   while (current <= endDate) {
     if (isWeekday(current)) count += 1;
     current.setUTCDate(current.getUTCDate() + 1);
   }
-
   return count;
 }
 
 function getPausedWeekdays(pausePeriods, periodStart, periodEnd) {
   const pausedDates = new Set();
-
   for (const pause of pausePeriods) {
     const pauseStart = parseDate(pause.pause_start);
     if (!pauseStart) continue;
@@ -54,14 +49,12 @@ function getPausedWeekdays(pausePeriods, periodStart, periodEnd) {
     const pauseEndExclusive = pause.resume_date
       ? parseDate(pause.resume_date)
       : new Date(periodEnd.getTime() + 86400000);
-
     if (!pauseEndExclusive) continue;
 
     const overlapStart = new Date(Math.max(pauseStart.getTime(), periodStart.getTime()));
     const overlapEndExclusive = new Date(
       Math.min(pauseEndExclusive.getTime(), periodEnd.getTime() + 86400000)
     );
-
     if (overlapStart >= overlapEndExclusive) continue;
 
     let current = overlapStart;
@@ -70,11 +63,18 @@ function getPausedWeekdays(pausePeriods, periodStart, periodEnd) {
       current.setUTCDate(current.getUTCDate() + 1);
     }
   }
-
   return pausedDates.size;
 }
 
 function getOwnershipSegments(subscription) {
+  if (!subscription.id || subscription.customer_id === undefined) {
+    return [{
+      customer_id: subscription.customer_id,
+      start_date: subscription.start_date,
+      end_date_exclusive: null
+    }];
+  }
+
   const transfers = db.prepare(
     `SELECT * FROM subscription_transfers
      WHERE subscription_id = ?
@@ -101,7 +101,6 @@ function getOwnershipSegments(subscription) {
     start_date: currentStart,
     end_date_exclusive: null
   });
-
   return segments;
 }
 
@@ -118,7 +117,6 @@ function getOwnershipIntersection(segment, serviceStart, serviceEnd) {
   const overlapEndInclusive = new Date(
     Math.min(segmentEndExclusive.getTime() - 86400000, serviceEnd.getTime())
   );
-
   if (overlapStart > overlapEndInclusive) return null;
   return { start: overlapStart, end: overlapEndInclusive };
 }
@@ -132,13 +130,7 @@ function calculateCustomerShareForSubscription(subscription, customerId, pausePe
 
   const serviceStart = new Date(Math.max(subscriptionStart.getTime(), bounds.start.getTime()));
   if (serviceStart > bounds.end) {
-    return {
-      service_days: 0,
-      paused_days: 0,
-      served_days: 0,
-      amount: 0,
-      ownership_segments: []
-    };
+    return { service_days: 0, total_cycle_service_days: 0, paused_days: 0, served_days: 0, amount: 0, ownership_segments: [] };
   }
 
   const totalServiceDays = getServiceDays(serviceStart, bounds.end);
@@ -153,27 +145,25 @@ function calculateCustomerShareForSubscription(subscription, customerId, pausePe
     if (!overlap) continue;
 
     const segmentServiceDays = getServiceDays(overlap.start, overlap.end);
-    const segmentPausePeriods = pausePeriods.filter((pause) => pause.customer_id === customerId);
-    const segmentPausedDays = getPausedWeekdays(segmentPausePeriods, overlap.start, overlap.end);
+    const segmentPausedDays = getPausedWeekdays(pausePeriods, overlap.start, overlap.end);
+    const safePausedDays = Math.min(segmentPausedDays, segmentServiceDays);
 
     customerSegments.push({
       customer_id: customerId,
       start_date: formatDate(overlap.start),
       end_date: formatDate(overlap.end),
       service_days: segmentServiceDays,
-      paused_days: Math.min(segmentPausedDays, segmentServiceDays),
-      served_days: Math.max(segmentServiceDays - segmentPausedDays, 0)
+      paused_days: safePausedDays,
+      served_days: Math.max(segmentServiceDays - safePausedDays, 0)
     });
 
     ownedServiceDays += segmentServiceDays;
-    pausedDays += Math.min(segmentPausedDays, segmentServiceDays);
+    pausedDays += safePausedDays;
   }
 
   const servedDays = Math.max(ownedServiceDays - pausedDays, 0);
   const monthlyPrice = Number(subscription.monthly_price);
-  const amount = totalServiceDays === 0
-    ? 0
-    : Number(((monthlyPrice * servedDays) / totalServiceDays).toFixed(2));
+  const amount = totalServiceDays === 0 ? 0 : Number(((monthlyPrice * servedDays) / totalServiceDays).toFixed(2));
 
   return {
     service_days: ownedServiceDays,
@@ -186,16 +176,35 @@ function calculateCustomerShareForSubscription(subscription, customerId, pausePe
 }
 
 function calculateBillForSubscription(subscription, pausePeriods, month) {
-  const customerId = subscription.customer_id;
-  const customerShare = calculateCustomerShareForSubscription(subscription, customerId, pausePeriods, month);
+  // Preserve the original pure calculation for unit tests and non-persisted objects.
+  if (!subscription.id || subscription.customer_id === undefined) {
+    const bounds = getMonthBounds(month);
+    if (!bounds) throw new Error("month must use YYYY-MM format");
+    const subscriptionStart = parseDate(subscription.start_date);
+    if (!subscriptionStart) throw new Error("Invalid subscription start date");
+
+    const serviceStart = new Date(Math.max(subscriptionStart.getTime(), bounds.start.getTime()));
+    if (serviceStart > bounds.end) {
+      return { month, monthly_price: Number(subscription.monthly_price), service_days: 0, paused_days: 0, served_days: 0, amount: 0 };
+    }
+
+    const serviceDays = getServiceDays(serviceStart, bounds.end);
+    const pausedDays = Math.min(getPausedWeekdays(pausePeriods, serviceStart, bounds.end), serviceDays);
+    const servedDays = Math.max(serviceDays - pausedDays, 0);
+    const monthlyPrice = Number(subscription.monthly_price);
+    const amount = serviceDays === 0 ? 0 : Number(((monthlyPrice * servedDays) / serviceDays).toFixed(2));
+    return { month, monthly_price: monthlyPrice, service_days: serviceDays, paused_days: pausedDays, served_days: servedDays, amount };
+  }
+
+  const share = calculateCustomerShareForSubscription(subscription, subscription.customer_id, pausePeriods, month);
   return {
     month,
     monthly_price: Number(subscription.monthly_price),
-    service_days: customerShare.service_days,
-    total_cycle_service_days: customerShare.total_cycle_service_days || customerShare.service_days,
-    paused_days: customerShare.paused_days,
-    served_days: customerShare.served_days,
-    amount: customerShare.amount
+    service_days: share.service_days,
+    total_cycle_service_days: share.total_cycle_service_days,
+    paused_days: share.paused_days,
+    served_days: share.served_days,
+    amount: share.amount
   };
 }
 
@@ -204,9 +213,7 @@ function getCustomerSubscriptionsForBilling(customerId) {
     `SELECT DISTINCT s.*
      FROM subscriptions s
      LEFT JOIN subscription_transfers t ON t.subscription_id = s.id
-     WHERE s.customer_id = ?
-        OR t.from_customer_id = ?
-        OR t.to_customer_id = ?
+     WHERE s.customer_id = ? OR t.from_customer_id = ? OR t.to_customer_id = ?
      ORDER BY s.id DESC`
   ).all(customerId, customerId, customerId);
 }
@@ -216,14 +223,9 @@ function getCustomerBill(customerId, month) {
   if (!subscriptions.length) return null;
 
   const pausePeriods = db.prepare(
-    `SELECT * FROM pause_periods
-     WHERE customer_id = ?
-     ORDER BY pause_start ASC`
+    `SELECT * FROM pause_periods WHERE customer_id = ? ORDER BY pause_start ASC`
   ).all(customerId);
-
-  const customer = db
-    .prepare("SELECT id, name, phone FROM customers WHERE id = ?")
-    .get(customerId);
+  const customer = db.prepare("SELECT id, name, phone FROM customers WHERE id = ?").get(customerId);
 
   const subscriptionBills = subscriptions.map((subscription) => {
     const share = calculateCustomerShareForSubscription(subscription, customerId, pausePeriods, month);
@@ -239,14 +241,14 @@ function getCustomerBill(customerId, month) {
         month,
         monthly_price: Number(subscription.monthly_price),
         service_days: share.service_days,
-        total_cycle_service_days: share.total_cycle_service_days || share.service_days,
+        total_cycle_service_days: share.total_cycle_service_days,
         paused_days: share.paused_days,
         served_days: share.served_days,
         amount: share.amount,
         ownership_segments: share.ownership_segments
       }
     };
-  }).filter((item) => item.billing.service_days > 0 || item.billing.served_days > 0 || item.billing.amount > 0 || item.subscription.active);
+  }).filter((item) => item.billing.service_days > 0 || item.billing.amount > 0 || item.subscription.active);
 
   if (!subscriptionBills.length) return null;
 
